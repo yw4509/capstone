@@ -173,7 +173,6 @@ class WikiDataset(Dataset):
             self.context.append(self.model.tokenizer.tokenize(qs))
             self.answers.append(self.model.tokenizer.tokenize(str(ans[0])))
 
-
     def _answers_idx(self):
         target_voc = voc(self.answers, minimum_count=1,max_num=35)
         self.answers = target_voc.main_df.target_indized.tolist()
@@ -434,7 +433,7 @@ if __name__=='__main__':
             filepath=args.output_dir, prefix="checkpoint", monitor="val_loss", mode="min", save_top_k=5)
     train_params = dict(
             accumulate_grad_batches=args.gradient_accumulation_steps,
-            gpus=0,
+            gpus=1,
             max_epochs=args.num_train_epochs,
             # early_stop_callback=False,
             precision=32,
@@ -447,7 +446,6 @@ if __name__=='__main__':
     ENC_HID_DIM = 768
     DEC_HID_DIM = 512
     DEC_DROPOUT = 0.5
-    teaching_forcing_ratio=0.5
 
     attn = Attention(ENC_HID_DIM, DEC_HID_DIM)
     dec = Decoder(OUTPUT_DIM, DEC_EMB_DIM, ENC_HID_DIM, DEC_HID_DIM, DEC_DROPOUT, attn)
