@@ -215,7 +215,7 @@ class Decoder(nn.Module):
         super().__init__()
         self.output_dim = output_dim
         self.attention = attention
-        self.embedding = nn.Embedding(output_dim, emb_dim)
+        self.embedding = nn.Embedding(output_dim, emb_dim, padding_idx = PAD_IDX)
         self.rnn = nn.GRU(enc_hid_dim + emb_dim, dec_hid_dim)
         self.fc_out = nn.Linear(enc_hid_dim + dec_hid_dim + emb_dim, output_dim)
         self.dropout = nn.Dropout(dropout)
