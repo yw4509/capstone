@@ -136,7 +136,7 @@ class WikiDataset(Dataset):
         self.data['title'] = self.data['title'].fillna('unknown')
         lens = self.data['answer'].apply(lambda x: len(model.tokenizer.tokenize(str(x[0]))))
         self.data = self.data.reset_index(drop=True)
-        print(self.data.shape)
+        # print(self.data.shape)
 
         self.tabs = []
         self.context = []
@@ -196,18 +196,18 @@ class Attention(nn.Module):
         # encoder_outputs = [src len, batch size, enc hid dim]
         batch_size = encoder_outputs.shape[1]
         src_len = encoder_outputs.shape[0]
-        print('attention shape:------------------------------------------------------------------------')
-        print('batch_size,src_len:',batch_size,src_len)
+        # print('attention shape:------------------------------------------------------------------------')
+        # print('batch_size,src_len:',batch_size,src_len)
 
         # repeat decoder hidden state src_len times
         hidden = hidden.unsqueeze(1).repeat(1, src_len, 1) # hidden = [batch size, src len, dec hid dim]
         encoder_outputs = encoder_outputs.permute(1, 0, 2) # encoder_outputs = [batch size, src len, enc hid dim]
-        print('attention hidden,encoder_outputs shape:',hidden.shape,encoder_outputs.shape)
+        # print('attention hidden,encoder_outputs shape:',hidden.shape,encoder_outputs.shape)
         energy = torch.tanh(self.attn(torch.cat((hidden, encoder_outputs), dim=2)))
         # energy = [batch size, src len, dec hid dim]
-        print('energy shape',energy.shape)
+        # print('energy shape',energy.shape)
         attention = self.v(energy).squeeze(2) # attention= [batch size, src len]
-        print('attention shape', attention.shape)
+        # print('attention shape', attention.shape)
         return F.softmax(attention, dim=1)
 
 
@@ -225,25 +225,25 @@ class Decoder(nn.Module):
         # input = [batch size]
         # hidden = [batch size, dec hid dim]
         # encoder_outputs = [src len, batch size, enc hid dim]
-        print('decoder shape:------------------------------------------------------------------------')
+        # print('decoder shape:------------------------------------------------------------------------')
         input = input.unsqueeze(0) #input = [1, batch size] [1,12]
-        print('input shape:',input.shape)
-        print('input:', input)
-        print('hidden shape:', hidden.shape)
-        print('encoder_outputs shape:', encoder_outputs.shape)
+        # print('input shape:',input.shape)
+        # print('input:', input)
+        # print('hidden shape:', hidden.shape)
+        # print('encoder_outputs shape:', encoder_outputs.shape)
         embedded = self.dropout(self.embedding(input))  # embedded = [1, batch size, emb dim]
-        print('embedded shape:',embedded.shape)
+        # print('embedded shape:',embedded.shape)
         a = self.attention(hidden, encoder_outputs)  # a = [batch size, src len]
         a = a.unsqueeze(1)  # a = [batch size, 1, src len]
         encoder_outputs = encoder_outputs.permute(1, 0, 2)  # encoder_outputs = [batch size,src len,enc hid dim]
 
         weighted = torch.bmm(a, encoder_outputs)  # weighted = [batch size, 1, enc hid dim]
         weighted = weighted.permute(1, 0, 2)  # weighted = [1, batch size, enc hid dim]
-        print('weighted shape:',weighted.shape)
+        # print('weighted shape:',weighted.shape)
         rnn_input = torch.cat((embedded, weighted), dim=2)  # rnn_input = [1, batch size, (enc hid dim) + emb dim] [1,12,768+256]
-        print('rnn input shape:',rnn_input.shape)
+        # print('rnn input shape:',rnn_input.shape)
         output, hidden = self.rnn(rnn_input, hidden.unsqueeze(0))
-        print('rnn output shape',output.shape,hidden.shape)
+        # print('rnn output shape',output.shape,hidden.shape)
         # seq len, n layers and n directions will always be 1 in this decoder, therefore:
         # output = [1, batch size, dec hid dim]
         # hidden = [1, batch size, dec hid dim]
@@ -268,9 +268,9 @@ class TaBERTTuner(pl.LightningModule):
 
     def forward(self, context_list, table_list, answer_list,teacher_forcing_ratio = 0.5):
         context_encoding, column_encoding, info_dict = self.model.encode(contexts=context_list, tables=table_list)
-        print('TaBERTTuner forward:--------------------------------------------------------------------------------------------------')
-        print('Encoder:--------------------------------------------------------------------------------------------------')
-        print('context_encoding, column_encoding, answer_list shape:',context_encoding.shape,column_encoding.shape, answer_list.shape)
+        # print('TaBERTTuner forward:--------------------------------------------------------------------------------------------------')
+        # print('Encoder:--------------------------------------------------------------------------------------------------')
+        # print('context_encoding, column_encoding, answer_list shape:',context_encoding.shape,column_encoding.shape, answer_list.shape)
         # context_encoding: [batch_size, token_size, 768] [12,17,768]
         # column_encoding: [batch_size, number of columns, 768] [12,6,768]
         # answer_list: [batch_size, 36] max_len is 35 and adds one for eos
@@ -282,9 +282,9 @@ class TaBERTTuner(pl.LightningModule):
         src = torch.cat([context_encoding, column_encoding], dim=1)  # [batch_size,scr_len,768*2] [12,123,768]
         encoder_outputs = src.permute(1,0,2)  # [src_len,batch_size,enc_hid_dim] [123,12,768]
         batch_size = encoder_outputs.shape[1]
-        print('scr shape:', src.shape)
-        print('encoder_outputs shape:', encoder_outputs.shape)
-        print('batch size:',batch_size)
+        # print('scr shape:', src.shape)
+        # print('encoder_outputs shape:', encoder_outputs.shape)
+        # print('batch size:',batch_size)
 
         hidden = torch.tanh(self.hidden(torch.sum(encoder_outputs, axis=0)))  # [batch_size=12,dec_hid_dim=512]
         print('encoder hidden output shape', hidden.shape)
@@ -312,17 +312,17 @@ class TaBERTTuner(pl.LightningModule):
 
     def _step(self, batch,teacher_forcing_ratio):
         tbl, ctx, ans = batch[0], batch[1], torch.tensor(batch[2])
-        print('step ----------------------------------------------------------------------------------------------------')
+        # print('step ----------------------------------------------------------------------------------------------------')
         outputs = self(ctx, tbl, ans,teacher_forcing_ratio =teacher_forcing_ratio) # output = [trg len, batch size, output dim]
         trg = ans # trg = [trg len, batch size]
-        print('outputs from step:', outputs.shape)
-        print('trg from step:', trg.shape)
+        # print('outputs from step:', outputs.shape)
+        # print('trg from step:', trg.shape)
 
         output_dim = outputs.shape[-1]
         outputs = outputs[0:].view(-1, output_dim) # output = [(trg len-0 ) * batch size, output dim]
         trg = trg[0:].view(-1)  # trg = [(trg len - 0) * batch size]
-        print('outputs from step:', outputs.shape)
-        print('trg from step:', trg.shape)
+        # print('outputs from step:', outputs.shape)
+        # print('trg from step:', trg.shape)
 
         criterion = nn.CrossEntropyLoss(ignore_index=0)
         loss = criterion(outputs, trg)
@@ -343,7 +343,7 @@ class TaBERTTuner(pl.LightningModule):
         return {"val_loss": loss}
 
     def validation_epoch_end(self, outputs):
-        print(outputs)
+        # print(outputs)
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
         tensorboard_logs = {"val_loss": avg_loss}
         return {"avg_val_loss": avg_loss, "log": tensorboard_logs, "progress_bar": tensorboard_logs}
