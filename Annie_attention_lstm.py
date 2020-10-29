@@ -1,10 +1,10 @@
 import argparse
+import random
 import glob
 import os
 import json
 import time
 import logging
-import random
 import re
 from itertools import chain
 from string import punctuation
@@ -12,8 +12,6 @@ from string import punctuation
 import nltk
 nltk.download('punkt')
 from nltk.tokenize import sent_tokenize
-import spacy
-from torchtext.data import Field, BucketIterator
 
 import torch
 from torch import nn
@@ -29,7 +27,6 @@ from tqdm import tqdm
 # from tqdm.notebook import tqdm_notebook as tqdm
 
 from transformers import AdamW, get_linear_schedule_with_warmup
-
 from table_bert import TableBertModel
 from table_bert import Table, Column
 
