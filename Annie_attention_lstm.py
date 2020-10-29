@@ -283,22 +283,22 @@ class TaBERTTuner(pl.LightningModule):
         # print('batch size:',batch_size)
 
         hidden = torch.tanh(self.hidden(torch.sum(encoder_outputs, axis=0)))  # [batch_size=12,dec_hid_dim=512]
-        print('encoder hidden output shape', hidden.shape)
+        # print('encoder hidden output shape', hidden.shape)
 
         trg_vocab_size = self.decoder.output_dim
         trg = answer_list.permute(1,0)  # [trg_len,batch_size] [36,12]
         trg_len = trg.shape[0]
-        print('trg_len:',trg_len)
-        print('trg shape:', trg.shape)
+        # print('trg_len:',trg_len)
+        # print('trg shape:', trg.shape)
 
         outputs = torch.zeros(trg_len, batch_size, trg_vocab_size)
-        print('storage output shape:', outputs.shape)
+        # print('storage output shape:', outputs.shape)
 
         input = trg[0, :]
-        print('input shape:',input.shape)
+        # print('input shape:',input.shape)
         for t in range(1, trg_len):
             output, hidden = self.decoder(input, hidden, encoder_outputs)
-            print('decoder_output,decoder_hidden',output.shape,hidden.shape)
+            # print('decoder_output,decoder_hidden',output.shape,hidden.shape)
             # place predictions in a tensor holding predictions for each token
             outputs[t] = output
             top1 = output.argmax(1)
