@@ -1,7 +1,8 @@
 import argparse
 import random
-import glob
 import os
+import pickle
+import glob
 import json
 import time
 import logging
@@ -94,23 +95,42 @@ class Lang:
         index_list = [self.word2index[token] if token in self.word2index else UNK_IDX for token in token_list]
         return torch.from_numpy(np.array(index_list)).to(device)
 
-class voc(Dataset):
-    def __init__(self, df, minimum_count = 1, max_num = 35):
+class voc():
+    def __init__(self, df, voc_location, minimum_count, max_num):
+        #df here is answers, list of list of tokens
+        self.df=df
         self.minimum_count = minimum_count;
         self.max_num = max_num;
-        self.main_df,self.voc = self.load_voc(df,minimum_count = 1);
+        self.voc_location = voc_location;
+        self.main_df, self.target_voc = self.load_or_create_voc()
+        #main df includes target_tokenized, target_indized, target_len
+        #target_voc is the Lang class with full vocab and can perform idx to token, token to idx, token to count opertations
     def __len__(self):
         return len(self.main_df) if self.max_num is None else self.max_num
     def __getitem__(self, idx):
         return_list = [self.main_df.iloc[idx]['target_indized'], self.main_df.iloc[idx]['target_len'] ]
         return return_list
-    def load_voc(self,df,minimum_count = 1):
-        target_voc_obj = Lang(minimum_count = 1);
-        for ans in df:
-            target_voc_obj.add_ans(ans)
+    def load_or_create_voc(self):
+        if not os.path.exists(self.voc_location):
+            os.makedirs(self.voc_location)
+        full_file_path = os.path.join(self.voc_location, 'mincnt_maxnum' +
+                                      str(self.minimum_count) + '_' + \
+                                      str(self.max_num)+'.p')
+        #if the address exits, we will load the dictionary from the full path,
+        #ow, we will create a new voc dictionary and pickle dump to full path
+        if os.path.isfile(full_file_path):
+            print('Load Pre-existing Voc Dictionary')
+            target_voc = pickle.load(open(full_file_path,'rb'))
+        else:
+            print('Create New Voc Dictionary')
+            target_voc = Lang(minimum_count = self.minimum_count);
+            for ans in self.df: # load ans into voc
+                target_voc.add_ans(ans)
+            pickle.dump(target_voc,open(full_file_path,'wb'))
+        # change token to idx based on dictionary
         indices_data = []
-        for ans in df:
-            index_list = [target_voc_obj.word2index[token] if token in target_voc_obj.word2index else UNK_IDX for token in ans]
+        for ans in self.df: # ans tokens to idx
+            index_list = [target_voc.word2index[token] if token in target_voc.word2index else UNK_IDX for token in ans]
             if len(index_list)<=self.max_num:
                 index_list = index_list + [PAD_IDX]*(self.max_num-len(index_list))
             else:
@@ -118,16 +138,20 @@ class voc(Dataset):
             index_list.append(EOS_IDX)
             indices_data.append(index_list)
         main_df = pd.DataFrame();
-        main_df['target_tokenized'] = df;
+        main_df['target_tokenized'] = self.df;
         main_df['target_indized'] = indices_data;
         main_df['target_len'] = main_df['target_tokenized'].apply(lambda x: len(x)+1) #+1 for EOS
-        main_df =  main_df[main_df['target_len'] >=2]
-        return main_df,target_voc_obj
+        main_df =  main_df[main_df['target_len'] >=2] #filter out ans that are empty
+        return main_df,target_voc
 
-class WikiDataset(Dataset):
-    def __init__(self, path, model):
+class WikiDataset():
+    def __init__(self, path, voc_location, model, minimum_count, max_num):
+        # the initalization will end up with four parts: tabs, context, answers and target_voc
         self.path = path
+        self.voc_location = voc_location
         self.model = model
+        self.minimum_count=minimum_count
+        self.max_num=max_num
 
         self.data = pd.read_json(self.path)
         self.data['title'] = self.data['title'].fillna('unknown')
@@ -140,16 +164,10 @@ class WikiDataset(Dataset):
         self.answers = []
 
         self._build()
-        self.voc = self._answers_idx()
+        self.voc_obj = voc(self.answers, self.voc_location, minimum_count=self.minimum_count, max_num=self.max_num)
 
-    def __len__(self):
-        return len(self.context)
-
-    def __getitem__(self, index):
-        tabi = self.tabs[index]
-        conti = self.context[index]
-        ansi = self.answers[index]
-        return {"table": tabi, "context": conti, "answer": ansi}
+        self.answers = self.voc_obj.main_df.target_indized.tolist()
+        self.target_voc=self.voc_obj.target_voc
 
     def _build(self):
         for idx in tqdm(range(len(self.data))):
@@ -170,13 +188,18 @@ class WikiDataset(Dataset):
             self.context.append(self.model.tokenizer.tokenize(qs))
             self.answers.append(self.model.tokenizer.tokenize(str(ans[0])))
 
-    def _answers_idx(self):
-        target_voc = voc(self.answers, minimum_count=1,max_num=35)
-        self.answers = target_voc.main_df.target_indized.tolist()
-        return target_voc
+    def __len__(self):
+        return len(self.context)
+    def __getitem__(self, index):
+        tabi = self.tabs[index]
+        conti = self.context[index]
+        ansi = self.answers[index]
+        return {"table": tabi, "context": conti, "answer": ansi}
 
-def get_dataset(path, model):
-    return WikiDataset(path=path, model=model)
+
+def get_dataset(path, voc_location, model, minimum_count=1,max_num=35):
+    return WikiDataset(path=path, voc_location=voc_location,model=model,\
+                       minimum_count=minimum_count,max_num=max_num)
 
 def collate_fn(batch):
     return [batch[i]['table'] for i in range(len(batch))], [batch[i]['context'] for i in range(len(batch))], torch.tensor([batch[i]['answer'] for i in range(len(batch))])
@@ -372,7 +395,8 @@ class TaBERTTuner(pl.LightningModule):
         return tqdm_dict
 
     def train_dataloader(self):
-        train_dataset = get_dataset(path=self.hparams.train_data, model=self.model)
+        train_dataset = get_dataset(path=self.hparams.train_data, voc_location=self.hparams.voc_location,model=self.model,\
+                                    minimum_count=self.hparams.minimum_count,max_num=self.hparams.max_num)
         dataloader = DataLoader(train_dataset, batch_size=self.hparams.train_batch_size, drop_last=True, shuffle=True,
                                 num_workers=4, collate_fn=collate_fn)
         t_total = (
@@ -386,7 +410,7 @@ class TaBERTTuner(pl.LightningModule):
         return dataloader
 
     def val_dataloader(self):
-        val_dataset = get_dataset(path=self.hparams.dev_data, model=self.model)
+        val_dataset = get_dataset(path=self.hparams.dev_data, voc_location=self.hparams.voc_location,model=self.model)
         return DataLoader(val_dataset, batch_size=self.hparams.eval_batch_size, num_workers=4, collate_fn=collate_fn)
 
 if __name__=='__main__':
@@ -406,9 +430,12 @@ if __name__=='__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     args_dict = dict(
-            train_data="./data/train_tabert.json",
-            dev_data="./data/dev_tabert.json",
+            train_data="./data/train_tabert_100.json",
+            dev_data="./data/dev_tabert_100.json",
+            voc_location='./voc',
             output_dir="./",
+            minimum_count=1,
+            max_num=35,
             learning_rate=3e-4,
             weight_decay=0.0,
             adam_epsilon=1e-8,
@@ -417,7 +444,7 @@ if __name__=='__main__':
             eval_batch_size=12,
             num_train_epochs=5,
             gradient_accumulation_steps=16,
-            n_gpu=1,
+            n_gpu=0,
             # early_stop_callback=False,
             fp_16=False,
             opt_level='O1',
@@ -430,7 +457,7 @@ if __name__=='__main__':
             filepath=args.output_dir, prefix="checkpoint", monitor="val_loss", mode="min", save_top_k=5)
     train_params = dict(
             accumulate_grad_batches=args.gradient_accumulation_steps,
-            gpus=1,
+            gpus=0,
             max_epochs=args.num_train_epochs,
             # early_stop_callback=False,
             precision=32,
