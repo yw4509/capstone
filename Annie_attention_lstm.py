@@ -442,9 +442,9 @@ if __name__=='__main__':
             warmup_steps=0,
             train_batch_size=16,
             eval_batch_size=12,
-            num_train_epochs=5,
+            num_train_epochs=200,
             gradient_accumulation_steps=16,
-            n_gpu=0,
+            n_gpu=1,
             # early_stop_callback=False,
             fp_16=False,
             opt_level='O1',
@@ -457,7 +457,7 @@ if __name__=='__main__':
             filepath=args.output_dir, prefix="checkpoint", monitor="val_loss", mode="min", save_top_k=5)
     train_params = dict(
             accumulate_grad_batches=args.gradient_accumulation_steps,
-            gpus=0,
+            gpus=1,
             max_epochs=args.num_train_epochs,
             # early_stop_callback=False,
             precision=32,
