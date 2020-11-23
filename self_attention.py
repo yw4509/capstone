@@ -516,7 +516,7 @@ if __name__=='__main__':
     args = parser.parse_args()
     train_data=args.td
     val_data = args.vd
-    lr = args.lr
+    lr = float(args.lr)
 
     set_seed(42)
 
