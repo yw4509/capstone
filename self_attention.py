@@ -552,7 +552,7 @@ if __name__=='__main__':
         gradient_clip_val=0.3,
         warmup_steps=100,
         gradient_accumulation_steps=16,
-        train_batch_size=32,
+        train_batch_size=16,
         eval_batch_size=12,
         num_train_epochs=2000,
         n_gpu=1,
