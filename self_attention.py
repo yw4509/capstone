@@ -507,6 +507,17 @@ class TaBERTTuner(pl.LightningModule):
                           collate_fn=collate_fn)
 
 if __name__=='__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='self attention model')
+    parser.add_argument('-td')
+    parser.add_argument('-vd')
+    parser.add_argument('-lr')
+
+    args = parser.parse_args()
+    train_data=args.td
+    val_data = args.vd
+    lr = args.lr
+
     set_seed(42)
 
     PAD_IDX = 0
@@ -524,13 +535,16 @@ if __name__=='__main__':
     print('device is:', device)
 
     args_dict = dict(
-        train_data="./data/train_tabert_0.01.json",
-        dev_data="./data/dev_tabert_0.01.json",
+        train_data=train_data,
+        #"./data/train_tabert.json",
+        dev_data=val_data,
+        #"./data/dev_tabert.json",
         voc_location='./voc',
         output_dir="./check_point",
         minimum_count=1,
         max_num=35,
-        lr=7.5e-4,
+        lr=lr,
+        #7.5e-4,
         dampening=0.9,  # increase 0.9-0.99. learning rate decrease by factor of 10
         momentum=0.99,
         weight_decay=1e-2,
