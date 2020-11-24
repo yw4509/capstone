@@ -30,7 +30,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 import warnings
 warnings.filterwarnings('ignore')
 from tqdm import tqdm
-from tqdm.notebook import tqdm_notebook as tqdm
+# from tqdm.notebook import tqdm_notebook as tqdm
 
 from transformers import AdamW, get_linear_schedule_with_warmup
 from table_bert import TableBertModel
@@ -141,12 +141,15 @@ class voc():
             else:
                 index_list = index_list[:self.max_num]
             index_list.append(EOS_IDX) # add EOS token to the answer
+            # print('index_list',index_list)
+            # print('ans',ans)
             indices_data.append(index_list)
         main_df = pd.DataFrame();
         main_df['target_tokenized'] = self.df;
         main_df['target_indized'] = indices_data;
         main_df['target_len'] = main_df['target_tokenized'].apply(lambda x: len(x)+1) #+1 for EOS
         main_df =  main_df[main_df['target_len'] >=2] #filter out ans that are empty
+        main_df['ind'] = main_df['target_len'] >=2
         return main_df,target_voc
 
 class WikiDataset():
@@ -172,6 +175,11 @@ class WikiDataset():
         self.voc_obj = voc(self.answers, self.voc_location, minimum_count=minimum_count, max_num=max_num)
 
         self.answers = self.voc_obj.main_df.target_indized.tolist()
+        ind = self.voc_obj.main_df.ind.tolist()
+        self.tabs = np.array(self.tabs)[ind] #remove the ones with ans len <2
+        self.context = np.array(self.context)[ind]
+        print('len check', len(self.answers)==len(self.tabs)==len(self.context))
+
         self.target_voc=self.voc_obj.target_voc
 
     def _build(self):
@@ -196,10 +204,20 @@ class WikiDataset():
     def __len__(self):
         return len(self.context)
     def __getitem__(self, index):
-        tabi = self.tabs[index]
-        conti = self.context[index]
-        ansi = self.answers[index]
-        return {"table": tabi, "context": conti, "answer": ansi}
+        if len(self.tabs)==len(self.context)==len(self.answers):
+            try:
+                tabi = self.tabs[index]
+                conti = self.context[index]
+                ansi = self.answers[index]
+                return {"table": tabi, "context": conti, "answer": ansi}
+            except IndexError:
+                print('Check the length and index')
+                print('length of table, context, ans', len(self.tabs), len(self.context),len(self.answers))
+                print('The current index is:', index)
+        else:
+            print('The lengths are not matching')
+            print('length of table, context, ans', len(self.tabs), len(self.context), len(self.answers))
+            print('The current index is:', index)
 
 def get_dataset(path, voc_location, model, minimum_count=1,max_num=35):
     return WikiDataset(path=path, voc_location=voc_location,model=model,\
