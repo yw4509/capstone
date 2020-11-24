@@ -107,7 +107,7 @@ class voc():
         self.minimum_count = minimum_count;
         self.max_num = max_num;
         self.voc_location = voc_location;
-        self.main_df, self.target_voc = self.load_or_create_voc()
+        self.main_df, self.target_voc, self.ind = self.load_or_create_voc()
         #main df includes target_tokenized, target_indized, target_len
         #target_voc is the Lang class with full vocab and can perform idx to token, token to idx, token to count opertations
     def __len__(self):
@@ -148,9 +148,9 @@ class voc():
         main_df['target_tokenized'] = self.df;
         main_df['target_indized'] = indices_data;
         main_df['target_len'] = main_df['target_tokenized'].apply(lambda x: len(x)+1) #+1 for EOS
+        ind = main_df['target_len'] >= 2 #store the inidication so we can filter out tabs and context
         main_df =  main_df[main_df['target_len'] >=2] #filter out ans that are empty
-        main_df['ind'] = main_df['target_len'] >=2
-        return main_df,target_voc
+        return main_df,target_voc,ind
 
 class WikiDataset():
     def __init__(self, path, voc_location, model, minimum_count, max_num):
@@ -172,10 +172,12 @@ class WikiDataset():
         self.answers = []
 
         self._build()
-        self.voc_obj = voc(self.answers, self.voc_location, minimum_count=minimum_count, max_num=max_num)
+        print('length of table, context, ans', len(self.tabs), len(self.context), len(self.answers))
 
+        self.voc_obj = voc(self.answers, self.voc_location, minimum_count=minimum_count, max_num=max_num)
         self.answers = self.voc_obj.main_df.target_indized.tolist()
-        ind = self.voc_obj.main_df.ind.tolist()
+        ind = self.voc_obj.ind
+        print('length of table, context, ans', len(self.tabs), len(self.context), len(self.answers))
         self.tabs = np.array(self.tabs)[ind] #remove the ones with ans len <2
         self.context = np.array(self.context)[ind]
         print('len check', len(self.answers)==len(self.tabs)==len(self.context))
@@ -530,11 +532,13 @@ if __name__=='__main__':
     parser.add_argument('-td')
     parser.add_argument('-vd')
     parser.add_argument('-lr')
+    parser.add_argument('-gpu')
 
     args = parser.parse_args()
     train_data=args.td
     val_data = args.vd
     lr = float(args.lr)
+    gpu = int(args.gpu)
 
     set_seed(42)
 
@@ -573,7 +577,7 @@ if __name__=='__main__':
         train_batch_size=16,
         eval_batch_size=12,
         num_train_epochs=2000,
-        n_gpu=1,
+        n_gpu=gpu,
         fp_16=False,  # fp_16 true will end up shorter trainning time. 32 is default
         opt_level='O1',  # pure or mixed precision
         seed=42
