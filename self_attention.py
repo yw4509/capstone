@@ -26,6 +26,7 @@ import numpy as np
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -493,13 +494,13 @@ class TaBERTTuner(pl.LightningModule):
         optimizers = [encoder_optimizer, decoder_optimizer]
 
         schedulers = [
-            {'scheduler': ReduceLROnPlateau(encoder_optimizer, mode="min", min_lr=7.5e-5, patience=5, verbose=True),
+            {'scheduler': ReduceLROnPlateau(encoder_optimizer, mode="min", min_lr=7.5e-5, patience=2, verbose=True),
              # might need to change here
              'monitor': "val_loss",  # Default: val_loss
              'interval': 'epoch',
              'frequency': 1
              },
-            {'scheduler': ReduceLROnPlateau(decoder_optimizer, mode="min", min_lr=7.5e-5, patience=5, verbose=True),
+            {'scheduler': ReduceLROnPlateau(decoder_optimizer, mode="min", min_lr=7.5e-5, patience=2, verbose=True),
              # might need to change here
              'monitor': "val_loss",  # Default: val_loss
              'interval': 'epoch',
@@ -591,6 +592,13 @@ if __name__=='__main__':
         prefix='checkpoint-{epoch:02d}',
         monitor="val_loss", mode="min", save_top_k=5)
 
+    early_stop_callback = EarlyStopping(
+        monitor='val_loss',
+        min_delta=0.00,
+        patience=3,
+        verbose=True,
+        mode='min'
+    )
     train_params = dict(
         accumulate_grad_batches=args.gradient_accumulation_steps,
         gpus=args.n_gpu,
@@ -599,8 +607,9 @@ if __name__=='__main__':
         gradient_clip_val=args.gradient_clip_val,
         auto_lr_find=True,
         precision=32,
-        checkpoint_callback=checkpoint_callback
-        # early_stop_callback=False,
+        checkpoint_callback=checkpoint_callback,
+        check_val_every_n_epoch=2,
+        callbacks=early_stop_callback,
     )
 
     OUTPUT_DIM = 11575
