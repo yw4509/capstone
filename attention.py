@@ -482,7 +482,7 @@ if __name__=='__main__':
         dev_data=val_data,
         #"./data/dev_tabert.json",
         voc_location='./voc',
-        output_dir="./check_point",
+        output_dir="./check_point_",
         minimum_count=1,
         max_num=35,
         lr=lr,
@@ -497,7 +497,7 @@ if __name__=='__main__':
         train_batch_size=16,
         eval_batch_size=12,
         num_train_epochs=2000,
-        n_gpu=gpu,
+        # n_gpu=gpu,
         fp_16=False,  # fp_16 true will end up shorter trainning time. 32 is default
         opt_level='O1',  # pure or mixed precision
         seed=42
@@ -513,7 +513,7 @@ if __name__=='__main__':
 
     train_params = dict(
         accumulate_grad_batches=args.gradient_accumulation_steps,
-        gpus=args.n_gpu,
+        # gpus=args.n_gpu,
         max_epochs=args.num_train_epochs,
         amp_level=args.opt_level,
         gradient_clip_val=args.gradient_clip_val,
