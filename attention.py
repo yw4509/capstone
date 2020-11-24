@@ -498,11 +498,10 @@ if __name__=='__main__':
         train_batch_size=16,
         eval_batch_size=12,
         num_train_epochs=2000,
-        # n_gpu=gpu,
+        n_gpu=gpu,
         fp_16=False,  # fp_16 true will end up shorter trainning time. 32 is default
         opt_level='O1',  # pure or mixed precision
         seed=42
-        # early_stop_callback=False,
     )
     args = argparse.Namespace(**args_dict)
     print(args_dict)

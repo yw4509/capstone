@@ -582,7 +582,6 @@ if __name__=='__main__':
         fp_16=False,  # fp_16 true will end up shorter trainning time. 32 is default
         opt_level='O1',  # pure or mixed precision
         seed=42
-        # early_stop_callback=False,
     )
     args = argparse.Namespace(**args_dict)
     print(args_dict)
