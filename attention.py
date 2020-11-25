@@ -413,13 +413,13 @@ class TaBERTTuner(pl.LightningModule):
                                  momentum = self.hparams.momentum)
         optimizers = [encoder_optimizer,decoder_optimizer]
         schedulers = [
-            {'scheduler': ReduceLROnPlateau(encoder_optimizer, mode="min", min_lr=7.5e-5, patience=1, verbose=True),
+            {'scheduler': ReduceLROnPlateau(encoder_optimizer, mode="min", min_lr= 1e-4, patience=1, verbose=True),
                 # might need to change here
              'monitor': "avg_train_loss",  # Default: val_loss
              'interval': 'epoch',
              'frequency': 1
                 },
-            {'scheduler': ReduceLROnPlateau(decoder_optimizer, mode="min", min_lr=7.5e-5, patience=1, verbose=True),
+            {'scheduler': ReduceLROnPlateau(decoder_optimizer, mode="min", min_lr= 1e-4, patience=1, verbose=True),
                 # might need to change here
              'monitor': "avg_train_loss" ,  # Default: val_loss
              'interval': 'epoch',
@@ -429,7 +429,7 @@ class TaBERTTuner(pl.LightningModule):
         return optimizers, schedulers
 
     def get_tqdm_dict(self):
-        tqdm_dict = {"loss": "{:.3f}".format(self.trainer.avg_loss), "lr": self.lr_scheduler.get_last_lr()[-1]}
+        tqdm_dict = {"loss": "{:.3f}".format(self.trainer.avg_loss)}
         return tqdm_dict
 
     def train_dataloader(self):
@@ -528,7 +528,7 @@ if __name__=='__main__':
         precision=32,
         checkpoint_callback=checkpoint_callback,
         check_val_every_n_epoch=2,
-        callbacks=early_stop_callback,
+        callbacks=[early_stop_callback],
     )
 
     OUTPUT_DIM = 11575
