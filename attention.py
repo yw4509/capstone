@@ -488,7 +488,7 @@ if __name__=='__main__':
         dev_data=val_data,
         #"./data/dev_tabert.json",
         voc_location='./voc',
-        output_dir="./check_point_",
+        output_dir="./check_point",
         minimum_count=1,
         max_num=35,
         lr=lr,
@@ -515,7 +515,7 @@ if __name__=='__main__':
 
     checkpoint_callback = ModelCheckpoint(
         filepath=args.output_dir,
-        prefix='checkpoint-{epoch:02d}',
+        prefix= str(lr) +'_checkpoint_attn-{epoch:02d}',
         monitor="val_loss", mode="min", save_top_k=5)
 
     early_stop_callback = EarlyStopping(

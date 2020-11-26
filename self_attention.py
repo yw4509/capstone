@@ -595,7 +595,7 @@ if __name__=='__main__':
 
     checkpoint_callback = ModelCheckpoint(
         filepath=args.output_dir,
-        prefix='checkpoint-{epoch:02d}',
+        prefix= str(lr) +'_checkpoint_self_attn-{epoch:02d}',
         monitor="val_loss", mode="min", save_top_k=5)
 
     early_stop_callback = EarlyStopping(
