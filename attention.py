@@ -413,13 +413,13 @@ class TaBERTTuner(pl.LightningModule):
                                  momentum = self.hparams.momentum)
         optimizers = [encoder_optimizer,decoder_optimizer]
         schedulers = [
-            {'scheduler': ReduceLROnPlateau(encoder_optimizer, mode="min", min_lr= 1e-4, patience=1, verbose=True),
+            {'scheduler': ReduceLROnPlateau(encoder_optimizer, mode="min", min_lr= self.hparams.minlr, patience=self.hparams.patience, verbose=True),
                 # might need to change here
              'monitor': "avg_train_loss",  # Default: val_loss
              'interval': 'epoch',
              'frequency': 1
                 },
-            {'scheduler': ReduceLROnPlateau(decoder_optimizer, mode="min", min_lr= 1e-4, patience=1, verbose=True),
+            {'scheduler': ReduceLROnPlateau(decoder_optimizer, mode="min", min_lr= self.hparams.minlr, patience=self.hparams.patience, verbose=True),
                 # might need to change here
              'monitor': "avg_train_loss" ,  # Default: val_loss
              'interval': 'epoch',
@@ -453,12 +453,17 @@ if __name__=='__main__':
     parser.add_argument('-td')
     parser.add_argument('-vd')
     parser.add_argument('-lr')
+    parser.add_argument('-minlr')
+    parser.add_argument('-p')
     parser.add_argument('-gpu')
+
 
     args = parser.parse_args()
     train_data=args.td
     val_data = args.vd
     lr = float(args.lr)
+    minlr = float(args.minlr)
+    patience = int(args.p)
     gpu = int(args.gpu)
 
     set_seed(42)
