@@ -492,6 +492,8 @@ if __name__=='__main__':
         minimum_count=1,
         max_num=35,
         lr=lr,
+        minlr=minlr,
+        patience=patience,
         #7.5e-4,
         dampening=0.9,  # increase 0.9-0.99. learning rate decrease by factor of 10
         momentum=0.99,
