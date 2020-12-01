@@ -3,6 +3,7 @@
 ## Classification
 
 ### Binary Classification
+### Multi Classification
 
 
 ## Seq to Seq Model
