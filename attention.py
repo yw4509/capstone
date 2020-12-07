@@ -43,115 +43,6 @@ def set_seed(seed):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-class Lang:
-    def __init__(self, minimum_count=1):
-        self.word2index = {}
-        self.word2count = {}
-
-        self.index2word = [None] * 4
-        self.index2word[SOS_IDX] = SOS_TOKEN
-        self.index2word[EOS_IDX] = EOS_TOKEN
-        self.index2word[UNK_IDX] = UNK_TOKEN
-        self.index2word[PAD_IDX] = PAD_TOKEN
-
-        self.word2count[SOS_TOKEN] = 100;
-        self.word2count[EOS_TOKEN] = 100;
-        self.word2count[UNK_TOKEN] = 100;
-        self.word2count[PAD_TOKEN] = 100;
-
-        self.word2index[SOS_TOKEN] = SOS_IDX;
-        self.word2index[EOS_TOKEN] = EOS_IDX;
-        self.word2index[UNK_TOKEN] = UNK_IDX;
-        self.word2index[PAD_TOKEN] = PAD_IDX;
-        self.n_words = 4  # Count SOS and EOS
-
-        self.minimum_count = minimum_count;
-
-    def add_ans(self, ans):
-        for word in ans:
-            self.addWord(word.lower())
-
-    def addWord(self, word):
-        if word not in self.word2count.keys():
-            self.word2count[word] = 1
-        else:
-            self.word2count[word] += 1
-        if self.word2count[word] >= self.minimum_count:
-            if word not in self.index2word:
-                word = str(word);
-                self.word2index[word] = self.n_words
-                self.index2word.append(word)
-                self.n_words += 1
-
-    def vec2txt(self, list_idx):
-        word_list = []
-        if type(list_idx) == list:
-            for i in list_idx:
-                if i not in [EOS_IDX, SOS_IDX, PAD_IDX]:
-                    word_list.append(self.index2word[i])
-        else:
-            for i in list_idx:
-                if i.item() not in [EOS_IDX, SOS_IDX, PAD_IDX]:
-                    word_list.append(self.index2word[i.item()])
-        return (' ').join(word_list)
-
-    def txt2vec(self, ans):
-        token_list = ans;
-        index_list = [self.word2index[token] if token in self.word2index else UNK_IDX for token in token_list]
-        return torch.from_numpy(np.array(index_list)).to(device)
-
-class voc():
-    def __init__(self, df, voc_location, minimum_count, max_num):
-        #df here is answers, list of list of tokens
-        self.df=df
-        self.minimum_count = minimum_count;
-        self.max_num = max_num;
-        self.voc_location = voc_location;
-        self.main_df, self.target_voc, self.ind = self.load_or_create_voc()
-        #main df includes target_tokenized, target_indized, target_len
-        #target_voc is the Lang class with full vocab and can perform idx to token, token to idx, token to count opertations
-    def __len__(self):
-        return len(self.main_df) if self.max_num is None else self.max_num
-    def __getitem__(self, idx):
-        return_list = [self.main_df.iloc[idx]['target_indized'], self.main_df.iloc[idx]['target_len'] ]
-        return return_list
-    def load_or_create_voc(self):
-        if not os.path.exists(self.voc_location):
-            os.makedirs(self.voc_location)
-        full_file_path = os.path.join(self.voc_location, 'mincnt_maxnum' +
-                                      str(self.minimum_count) + '_' + \
-                                      str(self.max_num)+'.p')
-        #if the address exits, we will load the dictionary from the full path,
-        #ow, we will create a new voc dictionary and pickle dump to full path
-        if os.path.isfile(full_file_path):
-            print('Load Pre-existing Voc Dictionary')
-            target_voc = pickle.load(open(full_file_path,'rb'))
-        else:
-            print('Create New Voc Dictionary')
-            target_voc = Lang(minimum_count = self.minimum_count);
-            for ans in self.df: # load ans into voc
-                target_voc.add_ans(ans)
-            pickle.dump(target_voc,open(full_file_path,'wb'))
-        # change token to idx based on dictionary
-        indices_data = []
-        for ans in self.df: # ans tokens to idx
-            index_list = [target_voc.word2index[token] if token in target_voc.word2index else UNK_IDX for token in ans]
-            if len(index_list)<=self.max_num:
-                index_list = index_list + [PAD_IDX]*(self.max_num-len(index_list))
-            else:
-                index_list = index_list[:self.max_num]
-            index_list.append(EOS_IDX) # add EOS token to the answer
-            # print('index_list',index_list)
-            # print('ans',ans)
-            indices_data.append(index_list)
-        main_df = pd.DataFrame();
-        main_df['target_tokenized'] = self.df;
-        main_df['target_indized'] = indices_data;
-        main_df['target_len'] = main_df['target_tokenized'].apply(lambda x: len(x)+1) #+1 for EOS
-        ind = main_df['target_len'] >= 2 #store the inidication so we can filter out tabs and context
-        main_df =  main_df[main_df['target_len'] >=2] #filter out ans that are empty
-        return main_df,target_voc,ind
-
 class WikiDataset():
     def __init__(self, path, voc_location, model, minimum_count, max_num):
         # the initalization will end up with four parts: tabs, context, answers and target_voc
@@ -174,16 +65,6 @@ class WikiDataset():
         self._build()
         print('length of table, context, ans', len(self.tabs), len(self.context), len(self.answers))
 
-        self.voc_obj = voc(self.answers, self.voc_location, minimum_count=minimum_count, max_num=max_num)
-        self.answers = self.voc_obj.main_df.target_indized.tolist()
-        ind = self.voc_obj.ind
-        print('length of table, context, ans', len(self.tabs), len(self.context), len(self.answers))
-        self.tabs = np.array(self.tabs)[ind] #remove the ones with ans len <2
-        self.context = np.array(self.context)[ind]
-        print('len check', len(self.answers)==len(self.tabs)==len(self.context))
-
-        self.target_voc=self.voc_obj.target_voc
-
     def _build(self):
         for idx in tqdm(range(len(self.data))):
             qs = self.data.loc[idx, 'context']
@@ -201,10 +82,26 @@ class WikiDataset():
             self.tabs.append(table)
 
             self.context.append(self.model.tokenizer.tokenize(qs))
-            self.answers.append(self.model.tokenizer.tokenize(str(ans[0])))
+#             print('ans:',ans)
+            ans_tokenized = self.model.tokenizer.tokenize(str(ans[0]))
+            encoded_dict = tokenizer.encode_plus(
+                        ans_tokenized,                      # Sentence to encode.
+                        add_special_tokens = True, # Add '[CLS]' and '[SEP]'
+                        truncation=True,
+                        max_length = 64,           # Pad & truncate all sentences.
+                        pad_to_max_length = True,
+                        return_attention_mask = True,   # Construct attn. masks.
+                        return_tensors = 'pt',     # Return pytorch tensors.
+                   )
+#             print('answers',ans[0])
+#             print('answers',ans_tokenized)
+#             print('tockenized answers:',encoded_dict['input_ids'])
+            self.answers.append(encoded_dict['input_ids'])
 
     def __len__(self):
         return len(self.context)
+    def _get_voc(self):
+        return self.target_voc
     def __getitem__(self, index):
         if len(self.tabs)==len(self.context)==len(self.answers):
             try:
@@ -468,6 +365,9 @@ if __name__=='__main__':
 
     set_seed(42)
 
+    from transformers import BertTokenizer
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
     PAD_IDX = 0
     UNK_IDX = 1
     SOS_IDX = 2
@@ -538,7 +438,7 @@ if __name__=='__main__':
         callbacks=[early_stop_callback],
     )
 
-    OUTPUT_DIM = 11575
+    OUTPUT_DIM = 32000
 
     ENC_HID_DIM = 768
 
