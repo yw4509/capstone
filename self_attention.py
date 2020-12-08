@@ -433,30 +433,30 @@ class TaBERTTuner(pl.LightningModule):
 
 if __name__=='__main__':
     import argparse
-    # parser = argparse.ArgumentParser(description='self attention model')
-    # parser.add_argument('-td')
-    # parser.add_argument('-vd')
-    # parser.add_argument('-lr')
-    # parser.add_argument('-minlr')
-    # parser.add_argument('-p')
-    # parser.add_argument('-gpu')
-    #
-    # args = parser.parse_args()
-    # train_data=args.td
-    # val_data = args.vd
-    # lr = float(args.lr)
-    # minlr = float(args.minlr)
-    # patience = int(args.p)
-    # gpu = int(args.gpu)
+    parser = argparse.ArgumentParser(description='self attention model')
+    parser.add_argument('-td')
+    parser.add_argument('-vd')
+    parser.add_argument('-lr')
+    parser.add_argument('-minlr')
+    parser.add_argument('-p')
+    parser.add_argument('-gpu')
+
+    args = parser.parse_args()
+    train_data=args.td
+    val_data = args.vd
+    lr = float(args.lr)
+    minlr = float(args.minlr)
+    patience = int(args.p)
+    gpu = int(args.gpu)
 
     set_seed(42)
 
-    train_data = "./data/train_tabert_0.01.json"
-    val_data = "./data/dev_tabert_0.01.json"
-    lr = float(2.5e-4)
-    minlr = float(1e-5)
-    patience = int(0)
-    gpu = int(0)
+    # train_data = "./data/train_tabert_0.01.json"
+    # val_data = "./data/dev_tabert_0.01.json"
+    # lr = float(2.5e-4)
+    # minlr = float(1e-5)
+    # patience = int(0)
+    # gpu = int(0)
 
     from transformers import BertTokenizer
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
