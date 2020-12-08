@@ -146,8 +146,8 @@ class Attention_Module(pl.LightningModule):
         '''
         x = self.l1(hidden)
         # [src_len,batch_size,enc_hid_dim]
-        encoder_outs = encoder_outs.permute(1, 0, 2)  # [ batch_size,src_len,dim]
-        att_score = torch.bmm(encoder_outs, x.unsqueeze(-1));  # this is bsz x seq x 1
+        encoder_outs = encoder_outs.permute(1, 0, 2) # [ batch_size,src_len,dim]
+        att_score = torch.bmm(encoder_outs, x.unsqueeze(-1))  # this is bsz x seq x 1
         att_score = att_score.squeeze(-1);  # this is bsz x seq
         att_score = att_score.transpose(0, 1);
 
@@ -180,8 +180,7 @@ class Attention_Module(pl.LightningModule):
         seq_length_expand = (sequence_length.unsqueeze(1)  # [batch_size,1]
                              .expand_as(seq_range_expand))  # [batch_size,max_len] seq_length repeated for max_len times
         # it returns a matrix of batch_size, max_len with diagonal above = True
-        return (seq_range_expand < seq_length_expand).float().to(device)
-        # return (seq_range_expand < seq_length_expand).float()
+        return (seq_range_expand < seq_length_expand).float()
 
 class Decoder_SelfAttn(pl.LightningModule):
     """Generates a sequence of tokens in response to context with self attention.
