@@ -90,7 +90,7 @@ class WikiDataset():
                         ans_tokenized,                      # Sentence to encode.
                         add_special_tokens = True, # Add '[CLS]' and '[SEP]'
                         truncation=True,
-                        max_length = 64,           # Pad & truncate all sentences.
+                        max_length = 35,           # Pad & truncate all sentences.
                         pad_to_max_length = True,
                         return_attention_mask = True,   # Construct attn. masks.
                         return_tensors = 'pt',     # Return pytorch tensors.
@@ -301,7 +301,7 @@ class TaBERTTuner(pl.LightningModule):
         # print('encoder hidden output shape', hidden.shape)
 
         trg_vocab_size = self.decoder.output_size
-        trg = torch.squeeze(answer_list) # answer list torch.Size([12, 1, 64]) => [12,64] (batch,seq_len)
+        trg = answer_list # answer list torch.Size([12, 1, 64]) => [12,64] (batch,seq_len)
         trg_len = trg.shape[1]
         # print('trg_len:',trg_len)
         # print('trg shape:', trg.shape)
@@ -319,9 +319,12 @@ class TaBERTTuner(pl.LightningModule):
     def _step(self, batch):
         tbl, ctx, ans = batch[0], batch[1], torch.tensor(batch[2])
         # print('step ----------------------------------------------------------------------------------------------------')
+        ans = torch.squeeze(ans,1)
         decoder_output = self(ctx, tbl, ans)  # output = [trg len, batch size, output dim]
         # print('decoder_output', decoder_output.shape)
         _max_score, predictions = decoder_output.max(2)
+        # print('predictions',predictions)
+        # print(predictions.shape)
         # ans = [trg len, batch size]   [w,w,w,w,eos]
         # print('outputs from step:', outputs.shape)
         # print('trg from step:', trg.shape)
@@ -329,6 +332,8 @@ class TaBERTTuner(pl.LightningModule):
 
         outputs = decoder_output.view(-1, output_dim)  # output = [(trg len-0 ) * batch size, output dim]
         trg = ans.contiguous().view(-1)  # trg = [(trg len - 0) * batch size] [w,w,w,w,eos]
+        # print('ans', ans)
+        # print(ans.shape)
         # print('outputs from step:', outputs.shape)
         # print('ans',ans.shape)
         # print('trg from step:', trg.shape)
@@ -428,30 +433,30 @@ class TaBERTTuner(pl.LightningModule):
 
 if __name__=='__main__':
     import argparse
-    parser = argparse.ArgumentParser(description='self attention model')
-    parser.add_argument('-td')
-    parser.add_argument('-vd')
-    parser.add_argument('-lr')
-    parser.add_argument('-minlr')
-    parser.add_argument('-p')
-    parser.add_argument('-gpu')
-
-    args = parser.parse_args()
-    train_data=args.td
-    val_data = args.vd
-    lr = float(args.lr)
-    minlr = float(args.minlr)
-    patience = int(args.p)
-    gpu = int(args.gpu)
+    # parser = argparse.ArgumentParser(description='self attention model')
+    # parser.add_argument('-td')
+    # parser.add_argument('-vd')
+    # parser.add_argument('-lr')
+    # parser.add_argument('-minlr')
+    # parser.add_argument('-p')
+    # parser.add_argument('-gpu')
+    #
+    # args = parser.parse_args()
+    # train_data=args.td
+    # val_data = args.vd
+    # lr = float(args.lr)
+    # minlr = float(args.minlr)
+    # patience = int(args.p)
+    # gpu = int(args.gpu)
 
     set_seed(42)
 
-    # train_data = "./data/train_tabert_0.01.json"
-    # val_data = "./data/dev_tabert_0.01.json"
-    # lr = float(2.5e-4)
-    # minlr = float(1e-5)
-    # patience = int(0)
-    # gpu = int(0)
+    train_data = "./data/train_tabert_0.01.json"
+    val_data = "./data/dev_tabert_0.01.json"
+    lr = float(2.5e-4)
+    minlr = float(1e-5)
+    patience = int(0)
+    gpu = int(0)
 
     from transformers import BertTokenizer
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
