@@ -144,10 +144,12 @@ class Attention_Module(pl.LightningModule):
         x: bsz x output_dim
         attn_score: bsz x sq_le
         '''
+        #         print(hidden.device)
+        #         print(encoder_outs.device)
         x = self.l1(hidden)
         # [src_len,batch_size,enc_hid_dim]
-        encoder_outs = encoder_outs.permute(1, 0, 2) # [ batch_size,src_len,dim]
-        att_score = torch.bmm(encoder_outs, x.unsqueeze(-1))  # this is bsz x seq x 1
+        encoder_outs = encoder_outs.permute(1, 0, 2)  # [ batch_size,src_len,dim]
+        att_score = torch.bmm(encoder_outs, x.unsqueeze(-1));  # this is bsz x seq x 1
         att_score = att_score.squeeze(-1);  # this is bsz x seq
         att_score = att_score.transpose(0, 1);
 
@@ -157,7 +159,8 @@ class Attention_Module(pl.LightningModule):
 
         seq_mask = self.sequence_mask(src_lens,
                                       max_len=max(src_lens).item(),
-                                     device = hidden.device).transpose(0, 1)
+                                      device=hidden.device).transpose(0, 1)
+        #         print(seq_mask.device)
         masked_att = seq_mask * att_score  # [seq_len, batch_size], [seq_len, batch_size] element multiplication
         masked_att[masked_att == 0] = -1e10
         attn_scores = F.softmax(masked_att, dim=0)  # [seq_len, batch_size]
@@ -166,7 +169,7 @@ class Attention_Module(pl.LightningModule):
         x = torch.tanh(self.l2(torch.cat((x, hidden), dim=1)))  # [batch_size, output_dim]
         return x, attn_scores
 
-    def sequence_mask(self, sequence_length, max_len=None, device = torch.device('cuda')):
+    def sequence_mask(self, sequence_length, max_len=None, device=torch.device('cuda')):
         #         print('max len', max_len) 16
         #         print('sequence_length',sequence_length) [16,14,12,11,11,16...] shape [batch_size]
         if max_len is None:
@@ -175,13 +178,13 @@ class Attention_Module(pl.LightningModule):
         #         print('batch_size',batch_size)
         seq_range = torch.arange(0, max_len).long()
         seq_range_expand = seq_range.unsqueeze(0).repeat([batch_size, 1])
-        seq_range_expand = seq_range_expand.to(device)  # [batch_size, max_len]
+        seq_range_expand = seq_range_expand  # [batch_size, max_len]
         #         print('seq_range_expand shape',seq_range_expand.shape)
 
         seq_length_expand = (sequence_length.unsqueeze(1)  # [batch_size,1]
                              .expand_as(seq_range_expand))  # [batch_size,max_len] seq_length repeated for max_len times
         # it returns a matrix of batch_size, max_len with diagonal above = True
-        return (seq_range_expand < seq_length_expand).float()
+        return (seq_range_expand < seq_length_expand).float().to(device)
 
 class Decoder_SelfAttn(pl.LightningModule):
     """Generates a sequence of tokens in response to context with self attention.
