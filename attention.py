@@ -314,13 +314,13 @@ class TaBERTTuner(pl.LightningModule):
         schedulers = [
             {'scheduler': ReduceLROnPlateau(encoder_optimizer, mode="min", min_lr= self.hparams.minlr, patience=self.hparams.patience, verbose=True),
                 # might need to change here
-             'monitor': "avg_train_loss",  # Default: val_loss
+             'monitor': "val_loss",  # Default: val_loss
              'interval': 'epoch',
              'frequency': 1
                 },
             {'scheduler': ReduceLROnPlateau(decoder_optimizer, mode="min", min_lr= self.hparams.minlr, patience=self.hparams.patience, verbose=True),
                 # might need to change here
-             'monitor': "avg_train_loss" ,  # Default: val_loss
+             'monitor': "val_loss" ,  # Default: val_loss
              'interval': 'epoch',
              'frequency': 1
                 }
