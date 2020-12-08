@@ -126,7 +126,7 @@ def get_dataset(path, voc_location, model, minimum_count=1,max_num=35):
                        minimum_count=minimum_count,max_num=max_num)
 
 def collate_fn(batch):
-    return [batch[i]['table'] for i in range(len(batch))], [batch[i]['context'] for i in range(len(batch))], torch.tensor([batch[i]['answer'] for i in range(len(batch))])
+    return [batch[i]['table'] for i in range(len(batch))], [batch[i]['context'] for i in range(len(batch))], torch.stack([batch[i]['answer'] for i in range(len(batch))])
 
 
 class Attention_Module(pl.LightningModule):
@@ -181,7 +181,7 @@ class Attention_Module(pl.LightningModule):
                              .expand_as(seq_range_expand))  # [batch_size,max_len] seq_length repeated for max_len times
         # it returns a matrix of batch_size, max_len with diagonal above = True
         return (seq_range_expand < seq_length_expand).float().to(device)
-
+        # return (seq_range_expand < seq_length_expand).float()
 
 class Decoder_SelfAttn(pl.LightningModule):
     """Generates a sequence of tokens in response to context with self attention.
@@ -282,7 +282,6 @@ class TaBERTTuner(pl.LightningModule):
         self.encoder = TableBertModel.from_pretrained('bert-base-uncased')
         self.hidden = nn.Linear(enc_hid_dim, dec_hid_dim)
         self.decoder = decoder
-        self.START = torch.LongTensor([SOS_IDX]).to(device)
 
     def forward(self, context_list, table_list, answer_list):
         context_encoding, column_encoding, info_dict = self.encoder.encode(contexts=context_list, tables=table_list)
@@ -294,7 +293,6 @@ class TaBERTTuner(pl.LightningModule):
         src = torch.cat([context_encoding, column_encoding], dim=1)  # [batch_size,scr_len,768*2] [12,123,768]
         encoder_output = src.permute(1, 0, 2)  # [src_len,batch_size,enc_hid_dim] [123,12,768]
         batch_size = encoder_output.shape[1]
-        starts = self.START.expand(batch_size, 1)  # expand to batch size; start is [SOS]
         # print('scr shape:', src.shape)
         # print('encoder_outputs shape:', encoder_outputs.shape)
         # print('batch size:',batch_size)
@@ -303,15 +301,15 @@ class TaBERTTuner(pl.LightningModule):
         # print('encoder hidden output shape', hidden.shape)
 
         trg_vocab_size = self.decoder.output_size
-        trg = answer_list  # [batch_size,trg_len] [64,36]
+        trg = torch.squeeze(answer_list) # answer list torch.Size([12, 1, 64]) => [12,64] (batch,seq_len)
         trg_len = trg.shape[1]
         # print('trg_len:',trg_len)
         # print('trg shape:', trg.shape)
 
-        # cut off eos from the input
-        y_in = trg.narrow(1, 0, trg.size(1) - 1)  # narrow(dim, start, length)
+        # cut off eos (in bert encoder is sep token) from the input
+        decoder_input = trg.narrow(1, 0, trg.size(1) - 0)  # narrow(dim, start, length)
         # add in sos in front of the sentence
-        decoder_input = torch.cat([starts, y_in], 1)
+        # decoder_input = torch.cat([starts, y_in], 1)
         decoder_output, decoder_hidden, _, _ = self.decoder(decoder_input,
                                                             encoder_hidden,
                                                             encoder_output)
@@ -322,6 +320,7 @@ class TaBERTTuner(pl.LightningModule):
         tbl, ctx, ans = batch[0], batch[1], torch.tensor(batch[2])
         # print('step ----------------------------------------------------------------------------------------------------')
         decoder_output = self(ctx, tbl, ans)  # output = [trg len, batch size, output dim]
+        # print('decoder_output', decoder_output.shape)
         _max_score, predictions = decoder_output.max(2)
         # ans = [trg len, batch size]   [w,w,w,w,eos]
         # print('outputs from step:', outputs.shape)
@@ -331,6 +330,7 @@ class TaBERTTuner(pl.LightningModule):
         outputs = decoder_output.view(-1, output_dim)  # output = [(trg len-0 ) * batch size, output dim]
         trg = ans.contiguous().view(-1)  # trg = [(trg len - 0) * batch size] [w,w,w,w,eos]
         # print('outputs from step:', outputs.shape)
+        # print('ans',ans.shape)
         # print('trg from step:', trg.shape)
         criterion = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
         outputs = outputs.to(device=device)
@@ -436,7 +436,6 @@ if __name__=='__main__':
     parser.add_argument('-p')
     parser.add_argument('-gpu')
 
-
     args = parser.parse_args()
     train_data=args.td
     val_data = args.vd
@@ -447,19 +446,18 @@ if __name__=='__main__':
 
     set_seed(42)
 
+    # train_data = "./data/train_tabert_0.01.json"
+    # val_data = "./data/dev_tabert_0.01.json"
+    # lr = float(2.5e-4)
+    # minlr = float(1e-5)
+    # patience = int(0)
+    # gpu = int(0)
+
     from transformers import BertTokenizer
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     PAD_IDX = 0
-    UNK_IDX = 1
-    SOS_IDX = 2
-    EOS_IDX = 3
-    SEP_IDX = 4
     PAD_TOKEN = '<pad>'
-    UNK_TOKEN = '<unk>'
-    SOS_TOKEN = '<sos>'
-    EOS_TOKEN = '<eos>'
-    SEP_TOKEN = '<sep>'  # separates utterances in the dialogue history
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print('device is:', device)

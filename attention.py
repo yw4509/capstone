@@ -123,7 +123,7 @@ def get_dataset(path, voc_location, model, minimum_count=1,max_num=35):
                        minimum_count=minimum_count,max_num=max_num)
 
 def collate_fn(batch):
-    return [batch[i]['table'] for i in range(len(batch))], [batch[i]['context'] for i in range(len(batch))], torch.tensor([batch[i]['answer'] for i in range(len(batch))])
+    return [batch[i]['table'] for i in range(len(batch))], [batch[i]['context'] for i in range(len(batch))], torch.stack([batch[i]['answer'] for i in range(len(batch))])
 
 class Attention(nn.Module):
     def __init__(self, enc_hid_dim, dec_hid_dim):
@@ -228,7 +228,9 @@ class TaBERTTuner(pl.LightningModule):
         # print('encoder hidden output shape', hidden.shape)
 
         trg_vocab_size = self.decoder.output_dim
-        trg = answer_list.permute(1,0)  # [trg_len,batch_size] [36,12]
+        # print(answer_list.shape)
+        # answer list torch.Size([12, 1, 64]) => [12,64]
+        trg = torch.squeeze(answer_list,dim=1).permute(1,0)  # [64,12] [trg_len, batch_size]
         trg_len = trg.shape[0]
         # print('trg_len:',trg_len)
         # print('trg shape:', trg.shape)
@@ -354,7 +356,6 @@ if __name__=='__main__':
     parser.add_argument('-p')
     parser.add_argument('-gpu')
 
-
     args = parser.parse_args()
     train_data=args.td
     val_data = args.vd
@@ -362,6 +363,13 @@ if __name__=='__main__':
     minlr = float(args.minlr)
     patience = int(args.p)
     gpu = int(args.gpu)
+
+    # train_data = "./data/train_tabert_0.01.json"
+    # val_data = "./data/dev_tabert_0.01.json"
+    # lr = float(2.5e-4)
+    # minlr = float(1e-5)
+    # patience = int(0)
+    # gpu = int(0)
 
     set_seed(42)
 
