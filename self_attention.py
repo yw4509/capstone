@@ -156,7 +156,8 @@ class Attention_Module(pl.LightningModule):
         src_lens = torch.ones(batch_size) * src_len
 
         seq_mask = self.sequence_mask(src_lens,
-                                      max_len=max(src_lens).item()).transpose(0, 1)
+                                      max_len=max(src_lens).item(),
+                                     device = hidden.device).transpose(0, 1)
         masked_att = seq_mask * att_score  # [seq_len, batch_size], [seq_len, batch_size] element multiplication
         masked_att[masked_att == 0] = -1e10
         attn_scores = F.softmax(masked_att, dim=0)  # [seq_len, batch_size]
@@ -165,7 +166,7 @@ class Attention_Module(pl.LightningModule):
         x = torch.tanh(self.l2(torch.cat((x, hidden), dim=1)))  # [batch_size, output_dim]
         return x, attn_scores
 
-    def sequence_mask(self, sequence_length, max_len=None):
+    def sequence_mask(self, sequence_length, max_len=None, device = torch.device('cuda')):
         #         print('max len', max_len) 16
         #         print('sequence_length',sequence_length) [16,14,12,11,11,16...] shape [batch_size]
         if max_len is None:
@@ -174,7 +175,7 @@ class Attention_Module(pl.LightningModule):
         #         print('batch_size',batch_size)
         seq_range = torch.arange(0, max_len).long()
         seq_range_expand = seq_range.unsqueeze(0).repeat([batch_size, 1])
-        seq_range_expand = seq_range_expand  # [batch_size, max_len]
+        seq_range_expand = seq_range_expand.to(device)  # [batch_size, max_len]
         #         print('seq_range_expand shape',seq_range_expand.shape)
 
         seq_length_expand = (sequence_length.unsqueeze(1)  # [batch_size,1]
