@@ -165,7 +165,7 @@ class Attention_Module(pl.LightningModule):
         x = torch.tanh(self.l2(torch.cat((x, hidden), dim=1)))  # [batch_size, output_dim]
         return x, attn_scores
 
-    def sequence_mask(self, sequence_length, max_len=None, device=torch.device('cuda')):
+    def sequence_mask(self, sequence_length, max_len=None):
         #         print('max len', max_len) 16
         #         print('sequence_length',sequence_length) [16,14,12,11,11,16...] shape [batch_size]
         if max_len is None:
