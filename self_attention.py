@@ -304,13 +304,13 @@ class TaBERTTuner(pl.LightningModule):
         # print('encoder hidden output shape', hidden.shape)
 
         trg_vocab_size = self.decoder.output_size
-        trg = answer_list # answer list torch.Size([12, 1, 64]) => [12,64] (batch,seq_len)
-        trg_len = trg.shape[1]
+        trg = answer_list # [12,35] (batch,seq_len)
+        trg_len = trg.shape[1] # 35
         # print('trg_len:',trg_len)
         # print('trg shape:', trg.shape)
 
         # cut off eos (in bert encoder is sep token) from the input
-        decoder_input = trg.narrow(1, 0, trg.size(1) - 0)  # narrow(dim, start, length)
+        decoder_input = trg.narrow(1, 0, trg.size(1) - 1)  # narrow(dim, start, length)
         # add in sos in front of the sentence
         # decoder_input = torch.cat([starts, y_in], 1)
         decoder_output, decoder_hidden, _, _ = self.decoder(decoder_input,
@@ -322,7 +322,7 @@ class TaBERTTuner(pl.LightningModule):
     def _step(self, batch):
         tbl, ctx, ans = batch[0], batch[1], torch.tensor(batch[2])
         # print('step ----------------------------------------------------------------------------------------------------')
-        ans = torch.squeeze(ans,1)
+        ans = torch.squeeze(ans,1) # [bs,35] 35 include sos and eos
         decoder_output = self(ctx, tbl, ans)  # output = [trg len, batch size, output dim]
         # print('decoder_output', decoder_output.shape)
         _max_score, predictions = decoder_output.max(2)
@@ -334,15 +334,19 @@ class TaBERTTuner(pl.LightningModule):
         output_dim = decoder_output.shape[-1]
 
         outputs = decoder_output.view(-1, output_dim)  # output = [(trg len-0 ) * batch size, output dim]
-        trg = ans.contiguous().view(-1)  # trg = [(trg len - 0) * batch size] [w,w,w,w,eos]
-        # print('ans', ans)
-        # print(ans.shape)
-        # print('outputs from step:', outputs.shape)
-        # print('ans',ans.shape)
-        # print('trg from step:', trg.shape)
+        trg = ans[:,1:].contiguous().view(-1)  # trg = [(trg len - 1) * batch size] [w,w,w,w,eos] cutoff sos from beginning
+#         print('ans', ans)
+#         print(ans.shape)
+#         print('outputs from step:', outputs.shape)
+#         print('ans',ans.shape)
+#         print('trg from step:', trg.shape)
         criterion = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
         outputs = outputs.to(device=device)
-        trg = trg.to(device=device)
+        trg = trg.to(device=device) #
+#         print('trg',trg)
+#         print('trg',trg.shape)
+#         print('predictions',predictions)
+#         print('predictions',predictions.shape)
         loss = criterion(outputs, trg)
         return loss
 
@@ -403,13 +407,13 @@ class TaBERTTuner(pl.LightningModule):
         schedulers = [
             {'scheduler': ReduceLROnPlateau(encoder_optimizer, mode="min", min_lr= self.hparams.minlr, patience=self.hparams.patience, verbose=True),
              # might need to change here
-             'monitor': "val_loss",  # Default: val_loss
+             'monitor': "avg_train_loss",  # Default: val_loss
              'interval': 'epoch',
              'frequency': 1
              },
             {'scheduler': ReduceLROnPlateau(decoder_optimizer, mode="min", min_lr= self.hparams.minlr, patience=self.hparams.patience, verbose=True),
              # might need to change here
-             'monitor': "val_loss",  # Default: val_loss
+             'monitor': "avg_train_loss",  # Default: val_loss
              'interval': 'epoch',
              'frequency': 1
              }
@@ -433,6 +437,7 @@ class TaBERTTuner(pl.LightningModule):
                                   model=self.encoder)
         return DataLoader(val_dataset, batch_size=self.hparams.eval_batch_size, num_workers=4,
                           collate_fn=collate_fn)
+
 
 if __name__=='__main__':
     import argparse
