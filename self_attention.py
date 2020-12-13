@@ -542,7 +542,8 @@ if __name__=='__main__':
     dec = Decoder_SelfAttn(output_size=OUTPUT_DIM, hidden_size=DEC_HID_DIM, idropout=0.5,
                            self_attention=True, encoder_attention=True)
     model = TaBERTTuner(args, enc_hid_dim=ENC_HID_DIM, dec_hid_dim=DEC_HID_DIM, decoder=dec)
-
+    model = model.load_from_checkpoint('/scratch/yw4509/capstone/check_point/5e-05_checkpoint_self_attn-{epoch:02d}-epoch=47.ckpt',
+                                       enc_hid_dim=ENC_HID_DIM, dec_hid_dim=DEC_HID_DIM, decoder=dec)
     trainer = pl.Trainer(**train_params)
     torch.cuda.empty_cache()
     trainer.fit(model)
