@@ -27,6 +27,10 @@ import pytorch_lightning as pl
 from tqdm import tqdm
 # from tqdm.notebook import tqdm_notebook as tqdm
 
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+
 from transformers import AdamW, get_linear_schedule_with_warmup, Adafactor
 
 from table_bert import TableBertModel
@@ -38,7 +42,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 flag = 2
 method = 'tanh'
 learningrate = 2.5e-4
-num_epoch= 500
+num_epoch= 1000
 max_len = 15 
 
 def set_seed(seed):
@@ -55,6 +59,7 @@ class WikiDataset(Dataset):
         self.model = model
 
         self.data = pd.read_json(self.path)
+        #self.data = pd.read_json(open(self.path, "r", encoding="utf8"))
 
         for i in range(len(self.data)):
             if self.data['sql_query'][i].get('agg_index') !=0:
@@ -89,11 +94,11 @@ class WikiDataset(Dataset):
             for j in range(len(rows)):
                 rows[j] = rows[j] + ['zzz']*(max_len-length)
             self.data['rows'][i] = rows
-        # print(self.data.shape)
+        #print(self.data.shape)
 
         self.tabs = []
         self.context = []
-        self.answers = []
+        #self.answers = []
         self.label = []  #jz
 
         self._build()
@@ -104,14 +109,15 @@ class WikiDataset(Dataset):
     def __getitem__(self, index):
         tabi = self.tabs[index]
         conti = self.context[index]
-        ansi = self.answers[index]
+        #ansi = self.answers[index]
         la = self.label[index]  #jz
-        return {"table": tabi, "context": conti, "answer": ansi, "label": la}  #jz
+        #return {"table": tabi, "context": conti, "answer": ansi, "label": la}  #jz
+        return {"table": tabi, "context": conti,  "label": la}
 
     def _build(self):
         for idx in tqdm(range(len(self.data))):
             qs = self.data.loc[idx, 'context']
-            ans = self.data.loc[idx, 'answer']
+            #ans = self.data.loc[idx, 'answer']
             heads = self.data.loc[idx, 'header']
             tit = self.data.loc[idx, 'title']
             rs = self.data.loc[idx, 'rows']
@@ -128,30 +134,18 @@ class WikiDataset(Dataset):
 
             self.tabs.append(table)
             self.context.append(self.model.tokenizer.tokenize(qs))
-            self.answers.append(self.model.tokenizer.convert_tokens_to_ids(self.model.tokenizer.tokenize(str(ans[0])))[0])
-            # self.answers.append(self.model.tokenizer.convert_tokens_to_ids(str(ans[0]))[0])
-
-            # self.answers.append(self.model.tokenizer.encode(str(ans[0]), add_sepcial_tokens=False)[0])
-            # ans_enc_t = self.model.tokenizer.encode(str(ans[0]),max_length=7,truncattion=True)
-            # ans_enc = ans_enc_t + [0] * (7 - len(ans_enc_t))
-            # self.answers.append(ans_enc)
-            self.label.append(label)  #jz
+            #self.answers.append(self.model.tokenizer.convert_tokens_to_ids(self.model.tokenizer.tokenize(str(ans[0])))[0])
+            self.label.append(label) 
 
 def get_dataset(path, model):
     return WikiDataset(path=path, model=model)
 
 def collate_fn(batch):
-    # print('table','-' * 100)
-    # print([batch[i]['table'] for i in range(len(batch))])
-    # print('context','-'*100)
-    # print([batch[i]['context'] for i in range(len(batch))])
-    # print('answer','-' * 100)
-    # print(torch.tensor([batch[i]['answer'] for i in range(len(batch))]))
     batch_0 = [batch[i]['table'] for i in range(len(batch))]
     batch_1 = [batch[i]['context'] for i in range(len(batch))]
-    batch_2 = torch.tensor([batch[i]['answer'] for i in range(len(batch))])
+    #batch_2 = torch.tensor([batch[i]['answer'] for i in range(len(batch))])
     batch_3 = torch.tensor([batch[i]['label'] for i in range(len(batch))])
-    return batch_0, batch_1, batch_2, batch_3
+    return batch_0, batch_1, batch_3
 
 
 class TaBERTTuner(pl.LightningModule):
@@ -182,7 +176,7 @@ class TaBERTTuner(pl.LightningModule):
 
     def forward(self, context_list, table_list):
         context_encoding, column_encoding, info_dict = self.model.encode(contexts=context_list, tables=table_list)
-        print(context_encoding.shape)
+        #print(context_encoding.shape)
         ctx_enc_sum = torch.sum(context_encoding, axis=1)
         ctx_enc_sum = ctx_enc_sum.unsqueeze(dim =1)  #jz: unsqueeze (2, 768) to (2, 1, 768) if batch size=2
         col_enc_sum = column_encoding #jz: for binary (2, 15, 768)
@@ -194,7 +188,7 @@ class TaBERTTuner(pl.LightningModule):
             if method == 'tanh':
                 out = F.tanh(out)
             out = self.l2(out)
-            #out = self.sm(out)
+            out = self.sm(out)
         
         if flag == 1: #add question embedding and column embedding
             ctx_col_sum = ctx_enc_sum + col_enc_sum
@@ -204,7 +198,7 @@ class TaBERTTuner(pl.LightningModule):
             if method == 'tanh':
                 out = F.tanh(out)
             out = self.l2(out)
-            #out = self.sm(out)
+            out = self.sm(out)
         
         if flag == 2: #concating question embedding and column embedding
             ctx_enc_sum = ctx_enc_sum.repeat(1, max_len, 1)  #repeat max_len times
@@ -215,13 +209,13 @@ class TaBERTTuner(pl.LightningModule):
             if method == 'tanh':
                 out = F.tanh(out)
             out = self.l2(out)
-            #out = self.sm(out)
+            out = self.sm(out)
 
         return out
 
     def _step(self, batch):
         #if torch.cuda.is_available():
-        tbl, ctx, ans, label = batch[0], batch[1], torch.tensor(batch[2]).to('cuda'), torch.tensor(batch[3]).to('cuda')
+        tbl, ctx, label = batch[0], batch[1], torch.tensor(batch[2]).to('cuda')
         #else:
             #tbl, ctx, ans, label  = batch[0], batch[1], torch.tensor(batch[2]), torch.tensor(batch[3])
 
@@ -250,7 +244,7 @@ class TaBERTTuner(pl.LightningModule):
         return {"val_loss": loss}
 
     def validation_epoch_end(self, outputs):
-        print(outputs)
+        #print(outputs)
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
         tensorboard_logs = {"val_loss": avg_loss}
         return {"avg_val_loss": avg_loss, "log": tensorboard_logs, "progress_bar": tensorboard_logs}
@@ -313,20 +307,19 @@ class TaBERTTuner(pl.LightningModule):
         return dataloader
 
     def val_dataloader(self):
-      val_dataset=get_dataset(path=self.hparams.dev_data, model = self.model)
-      return  DataLoader(val_dataset, batch_size=self.hparams.eval_batch_size, num_workers=4,collate_fn=collate_fn)
+        val_dataset=get_dataset(path=self.hparams.dev_data, model = self.model)
+        return  DataLoader(val_dataset, batch_size=self.hparams.eval_batch_size, num_workers=4,collate_fn=collate_fn)
 
-    # def collate_fn(batch):
-    #   return [batch[i]['table'] for i in range(len(batch))], [batch[i]['context'] for i in range(len(batch))], torch.tensor([batch[i]['answer'] for i in range(len(batch))])
+    def test_dataloader(self):
+        test_dataset=get_dataset(path=self.hparams.test_data, model = self.model)
+        return  DataLoader(test_dataset, batch_size=self.hparams.eval_batch_size, num_workers=4,collate_fn=collate_fn)
 
 if __name__=='__main__':
-    # df = pd.read_json('./data/train_tabert.json')
-    # print()
     set_seed(42)
     args_dict = dict(
-        train_data="train_sample.json",
-        # dev_data="dev_tabert.json",
-        dev_data="dev_sample.json",
+        train_data="train_tabert.json",
+        dev_data="dev_tabert.json",
+        test_data="test_tabert.json",
         output_dir="./",
         learning_rate=learningrate,
         momentum = 0.99, 
@@ -334,13 +327,12 @@ if __name__=='__main__':
         adam_epsilon=1e-8,
         warmup_steps=0,
         train_batch_size=16,
-        #train_batch_size=64,
-        eval_batch_size=12,
+        eval_batch_size=16,
         # change epoch here
         num_train_epochs=num_epoch,
         gradient_accumulation_steps=16,
         n_gpu=1,
-        early_stop_callback=False,
+        #early_stop_callback=False,#early stop
         fp_16=False,
         opt_level='O1',
         # max_grad_norm=1.0,
@@ -349,8 +341,21 @@ if __name__=='__main__':
     )
     args = argparse.Namespace(**args_dict)
     print(args_dict)
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        filepath=args.output_dir, prefix="checkpoint", monitor="val_loss", mode="min", save_top_k=1)
+    checkpoint_callback =ModelCheckpoint(
+        filepath=args.output_dir,
+        prefix= str('binary_sm') +'_checkpoint_-{epoch:02d}',
+        monitor="val_loss", mode="min", save_top_k=1)
+
+    #checkpoint_callback = pl.callbacks.ModelCheckpoint(
+       # filepath=args.output_dir, prefix="checkpoint", monitor="val_loss", mode="min", save_top_k=1)
+    early_stop_callback = EarlyStopping(
+        monitor='val_loss',
+        min_delta=0.00,
+        patience=3,
+        verbose=True,
+        mode='min'
+    )
+
     train_params = dict(
         accumulate_grad_batches=args.gradient_accumulation_steps,
         gpus=1,
@@ -360,9 +365,14 @@ if __name__=='__main__':
         precision=32,
         amp_level=args.opt_level,
         gradient_clip_val=args.max_grad_norm,
-        checkpoint_callback=checkpoint_callback
+        checkpoint_callback=checkpoint_callback,
+        callbacks=[early_stop_callback],
     )
     model = TaBERTTuner(args)
     trainer = pl.Trainer(**train_params)
     torch.cuda.empty_cache()
     trainer.fit(model)
+
+    # 
+
+    
