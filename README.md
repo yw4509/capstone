@@ -26,6 +26,7 @@ self_attention.py
 4. minimum learning rate: minlr
 5. patience: p
 6. number of pgu: gpu
+
 example:
 python self_attention.py -td "./data/train_tabert.json" -vd "./data/dev_tabert.json" -lr 5e-5 -minlr 2.5e-8 -p 4 -gpu 1
 
