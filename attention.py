@@ -461,3 +461,19 @@ if __name__=='__main__':
     trainer = pl.Trainer(**train_params)
     torch.cuda.empty_cache()
     trainer.fit(model)
+    
+        ### The following are the validation code
+#     pretrained_model = model.load_from_checkpoint(
+#     checkpoint_path='path to the check point',
+#     map_location=None,
+#     enc_hid_dim=ENC_HID_DIM,dec_hid_dim=DEC_HID_DIM,decoder=dec)
+#     pretrained_model = pretrained_model.to(device)
+#     pretrained_model.eval()
+#     pretrained_model.freeze()
+#     val = model.val_dataloader()
+#     result=[]
+#     target=[]
+#     for batch in tqdm(val):
+#         pred,ans = pretrained_model._step(batch)
+#         result.append(pred)
+#         target.append(ans)
